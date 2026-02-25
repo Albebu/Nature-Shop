@@ -1,0 +1,14 @@
+node_modules/
+dist/
+build/
+.env*
+!.env.example
+!**/.env.example
+*.tsbuildinfo
+.DS_Store
+Thumbs.db
+.idea/
+k8s/**/*secret*.yaml
+k8s/**/*secrets*.yaml
+!k8s/**/*secret.example.yaml
+docs/

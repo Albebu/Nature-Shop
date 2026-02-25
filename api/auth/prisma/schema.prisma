@@ -1,0 +1,93 @@
+// =============================================================================
+// AUTH SERVICE - Prisma Schema
+// =============================================================================
+// Microservicio de autenticación para Nature Shop
+// - Tenants (empresas)
+// - Users (empleados + customers)
+// - Refresh Tokens (JWT)
+// =============================================================================
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// =============================================================================
+// TENANT (Empresa)
+// =============================================================================
+
+model Tenant {
+  id       String  @id @default(cuid())
+  name     String  @db.VarChar(100)
+  slug     String  @unique @db.VarChar(50)
+  isActive Boolean @default(true) @map("is_active")
+
+  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  users User[]
+
+  @@index([id])
+  @@index([slug])
+  @@map("tenants")
+}
+
+// =============================================================================
+// USER (Usuarios con cuenta - Employees + Customers)
+// =============================================================================
+
+enum UserType {
+  EMPLOYEE
+  CUSTOMER
+}
+
+model User {
+  id              String    @id @default(cuid())
+  email           String    @unique @db.VarChar(255)
+  passwordHash    String    @map("password_hash") @db.VarChar(255)
+  phone           String?   @db.VarChar(20)
+  firstName       String    @map("first_name") @db.VarChar(100)
+  lastName        String    @map("last_name") @db.VarChar(100)
+  userType        UserType  @default(CUSTOMER) @map("user_type")
+  isActive        Boolean   @default(true) @map("is_active")
+  emailVerifiedAt DateTime? @map("email_verified_at")
+
+  // FK - Solo para EMPLOYEE
+  tenantId String? @map("tenant_id") @db.VarChar(30)
+  tenant   Tenant? @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  deletedAt DateTime? @map("deleted_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  refreshTokens RefreshToken[]
+
+  @@index([tenantId])
+  @@index([email])
+  @@map("users")
+}
+
+// =============================================================================
+// REFRESH TOKEN (JWT)
+// =============================================================================
+
+model RefreshToken {
+  id        String    @id @default(cuid())
+  userId    String    @map("user_id")
+  token     String    @unique @map("token") @db.VarChar(255)
+  expiresAt DateTime  @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([userId])
+  @@map("refresh_tokens")
+}

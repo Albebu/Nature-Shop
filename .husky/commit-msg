@@ -1,0 +1,28 @@
+#!/usr/bin/env sh
+
+# Validate commit message follows Conventional Commits spec:
+# https://www.conventionalcommits.org/
+#
+# Examples:
+#   feat(auth): add JWT refresh token endpoint
+#   fix(orders): correct stock validation logic
+#   chore: update dependencies
+#   docs: add architecture decision records
+#   test(products): add unit tests for CreateProduct use case
+
+commit_msg=$(cat "$1")
+
+# Pattern: type(optional-scope): description
+pattern='^(feat|fix|docs|style|refactor|perf|test|chore|ci|build|revert)(\([a-z0-9-]+\))?: .{1,100}$'
+
+if ! echo "$commit_msg" | grep -qE "$pattern"; then
+  echo ""
+  echo "✘  Invalid commit message format."
+  echo ""
+  echo "   Expected: <type>(<scope>): <description>"
+  echo "   Example:  feat(auth): add JWT refresh token endpoint"
+  echo ""
+  echo "   Valid types: feat | fix | docs | style | refactor | perf | test | chore | ci | build | revert"
+  echo ""
+  exit 1
+fi

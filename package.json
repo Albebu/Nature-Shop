@@ -1,0 +1,45 @@
+{
+  "name": "@ecommerce/nature-shop",
+  "version": "0.0.0",
+  "description": "An ecommerce platform built with Next.js, Express and PostgreSQL specialiced in the commercialization of health and therapeutic products.",
+  "keywords": [],
+  "author": "Albebu",
+  "license": "ISC",
+  "packageManager": "pnpm@10.26.2",
+  "private": true,
+  "engines": {
+    "node": ">=22.0.0",
+    "pnpm": ">=10.0.0"
+  },
+  "scripts": {
+    "lint": "eslint \"**/*.ts\"",
+    "lint:fix": "eslint \"**/*.ts\" --fix",
+    "format": "prettier --write \"**/*.{ts,json,yaml,yml}\"",
+    "format:check": "prettier --check \"**/*.{ts,json,yaml,yml}\"",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "test:coverage": "pnpm -r test:coverage",
+    "build": "pnpm -r build",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.20.0",
+    "@types/node": "^22.13.0",
+    "eslint": "^9.20.0",
+    "eslint-config-prettier": "^10.0.1",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.4.3",
+    "prettier": "^3.8.1",
+    "typescript": "^5.7.3",
+    "typescript-eslint": "^8.24.0"
+  },
+  "lint-staged": {
+    "**/*.ts": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "**/*.{json,yaml,yml,md}": [
+      "prettier --write"
+    ]
+  }
+}

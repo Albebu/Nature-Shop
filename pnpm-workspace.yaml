@@ -1,0 +1,5 @@
+packages:
+  - 'ui/*'
+  - 'api/*'
+  - 'shared'
+  - 'k8s/*'
