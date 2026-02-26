@@ -3,7 +3,7 @@ import { RegisterUseCase } from '@application/use-cases/register.use-case.js';
 import { User } from '@domain/entities/user.js';
 import type { Logger } from '@domain/ports/logger.port.js';
 import type { PasswordService } from '@domain/ports/password.service.js';
-import { RefreshTokenRepository } from '@domain/ports/refresh-token.repository.js';
+import type { RefreshTokenRepository } from '@domain/ports/refresh-token.repository.js';
 import type { TokenService } from '@domain/ports/token.service.js';
 import type { UserRepository } from '@domain/ports/user.repository.js';
 import { ConflictError } from '@ecommerce/shared';

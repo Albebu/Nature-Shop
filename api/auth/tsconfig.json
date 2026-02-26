@@ -13,6 +13,6 @@
     }
   },
   "include": ["src/**/*", "tests/**/*", "prisma.config.ts", "vitest.config.ts"],
-  "exclude": ["node_modules", "dist", "coverage", "**/*.test.ts", "**/*.spec.ts"],
+  "exclude": ["node_modules", "dist", "coverage"],
   "references": [{ "path": "../../shared" }]
 }
