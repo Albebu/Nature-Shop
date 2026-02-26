@@ -38,4 +38,11 @@ export class RefreshTokenRepositoryPrisma implements RefreshTokenRepository {
       data: { revokedAt: new Date() },
     });
   }
+
+  async revokeByToken(token: string): Promise<void> {
+    await this.db.refreshToken.updateMany({
+      where: { token, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+  }
 }
