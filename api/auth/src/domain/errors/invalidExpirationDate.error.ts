@@ -1,4 +1,4 @@
-import { DomainError } from './domain.error.js';
+import { DomainError } from '@ecommerce/shared';
 
 export class InvalidExpirationDateError extends DomainError {
   constructor() {

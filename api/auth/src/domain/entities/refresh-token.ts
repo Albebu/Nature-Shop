@@ -61,6 +61,10 @@ export class RefreshToken {
     return new RefreshToken({ id, userId, token, expiresAt, revokedAt });
   }
 
+  isExpired(): boolean {
+    return this.expiresAt <= new Date();
+  }
+
   getId(): string {
     return this.id;
   }

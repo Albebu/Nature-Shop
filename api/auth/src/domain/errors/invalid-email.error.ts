@@ -1,4 +1,4 @@
-import { DomainError } from './domain.error.js';
+import { DomainError } from '@ecommerce/shared';
 
 export class InvalidEmailError extends DomainError {
   constructor(email: string) {
