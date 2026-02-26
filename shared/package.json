@@ -14,14 +14,26 @@
   },
   "scripts": {
     "build": "tsc --project tsconfig.json",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "pino": "^10.3.1",
     "pino-http": "^11.0.0"
   },
+  "peerDependencies": {
+    "express": ">=5.0.0",
+    "zod": ">=4.0.0"
+  },
   "devDependencies": {
+    "@types/express": "^5.0.6",
     "@types/node": "^22.19.11",
-    "typescript": "^5.7.3"
+    "@vitest/coverage-v8": "^4.0.18",
+    "express": "^5.2.1",
+    "typescript": "^5.7.3",
+    "vitest": "^4.0.18",
+    "zod": "^4.3.6"
   }
 }
