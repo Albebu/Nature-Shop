@@ -85,6 +85,20 @@ describe('User', () => {
 
       expect(user.getTenantId()).toBeNull();
     });
+
+    it('should always be active when created', () => {
+      const user = User.create({
+        id: 'user-123',
+        tenantId: null,
+        firstName: 'Alex',
+        lastName: 'Bellosta',
+        email: 'alex@example.com',
+        passwordHash: '$argon2id$hash',
+        userType: 'CUSTOMER',
+      });
+
+      expect(user.getIsActive()).toBe(true);
+    });
   });
 
   // ── fromDB() ───────────────────────────────────────────────
@@ -118,6 +132,35 @@ describe('User', () => {
       });
 
       expect(user.getTenantId()).toBeNull();
+    });
+
+    it('should preserve isActive false from DB', () => {
+      const user = User.fromDB({
+        id: 'user-123',
+        tenantId: null,
+        firstName: 'Alex',
+        lastName: 'Bellosta',
+        email: 'alex@example.com',
+        passwordHash: '$argon2id$hash',
+        userType: 'CUSTOMER',
+        isActive: false,
+      });
+
+      expect(user.getIsActive()).toBe(false);
+    });
+
+    it('should default isActive to true when not provided', () => {
+      const user = User.fromDB({
+        id: 'user-123',
+        tenantId: null,
+        firstName: 'Alex',
+        lastName: 'Bellosta',
+        email: 'alex@example.com',
+        passwordHash: '$argon2id$hash',
+        userType: 'CUSTOMER',
+      });
+
+      expect(user.getIsActive()).toBe(true);
     });
   });
 
@@ -158,6 +201,24 @@ describe('User', () => {
       expect(payload).not.toHaveProperty('passwordHash');
       expect(payload).not.toHaveProperty('email');
       expect(payload).not.toHaveProperty('firstName');
+    });
+  });
+
+  // ── getUserType() ──────────────────────────────────────────
+
+  describe('getUserType', () => {
+    it('should return the user type', () => {
+      const user = User.fromDB({
+        id: 'user-123',
+        tenantId: null,
+        firstName: 'Alex',
+        lastName: 'Bellosta',
+        email: 'alex@example.com',
+        passwordHash: '$argon2id$hash',
+        userType: 'EMPLOYEE',
+      });
+
+      expect(user.getUserType()).toBe('EMPLOYEE');
     });
   });
 

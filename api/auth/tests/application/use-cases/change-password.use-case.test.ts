@@ -3,7 +3,7 @@ import { ChangePasswordUseCase } from '@application/use-cases/change-password.us
 import { User } from '@domain/entities/user.js';
 import type { PasswordService } from '@domain/ports/password.service.js';
 import type { UserRepository } from '@domain/ports/user.repository.js';
-import { NotFoundError } from '@ecommerce/shared';
+import { NotFoundError, UnauthorizedError } from '@ecommerce/shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ─── Mocks ──────────────────────────────────────────────────────
@@ -21,15 +21,17 @@ const mockPasswordService: PasswordService = {
 
 // ─── Fixtures ───────────────────────────────────────────────────
 
-const EXISTING_USER = User.fromDB({
-  id: 'user-123',
-  tenantId: 'tenant-456',
-  firstName: 'Alex',
-  lastName: 'Bellosta',
-  email: 'alex@example.com',
-  passwordHash: '$argon2id$old_hash',
-  userType: 'CUSTOMER',
-});
+// Factory para evitar mutación entre tests — User.setPasswordHash muta el objeto
+const buildExistingUser = (): User =>
+  User.fromDB({
+    id: 'user-123',
+    tenantId: 'tenant-456',
+    firstName: 'Alex',
+    lastName: 'Bellosta',
+    email: 'alex@example.com',
+    passwordHash: '$argon2id$old_hash',
+    userType: 'CUSTOMER',
+  });
 
 const VALID_INPUT: ChangePasswordDto = {
   userId: 'user-123',
@@ -47,13 +49,15 @@ describe('ChangePasswordUseCase', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
-    vi.mocked(mockUserRepository.findById).mockResolvedValue(EXISTING_USER);
+    // Fresh instance per test — prevents mutation leaking between tests
+    vi.mocked(mockUserRepository.findById).mockResolvedValue(buildExistingUser());
+    vi.mocked(mockPasswordService.verifyPassword).mockResolvedValue(true);
     vi.mocked(mockPasswordService.hashPassword).mockResolvedValue(NEW_HASH);
 
     sut = new ChangePasswordUseCase(mockUserRepository, mockPasswordService);
   });
 
-  // ── Unhappy path ───────────────────────────────────────────
+  // ── Unhappy paths ──────────────────────────────────────────
 
   describe('when user does not exist', () => {
     it('should throw NotFoundError', async () => {
@@ -72,9 +76,35 @@ describe('ChangePasswordUseCase', () => {
     });
   });
 
+  describe('when current password is incorrect', () => {
+    it('should throw UnauthorizedError', async () => {
+      vi.mocked(mockPasswordService.verifyPassword).mockResolvedValue(false);
+
+      await expect(sut.execute(VALID_INPUT)).rejects.toThrow(UnauthorizedError);
+    });
+
+    it('should NOT hash or save anything', async () => {
+      vi.mocked(mockPasswordService.verifyPassword).mockResolvedValue(false);
+
+      await sut.execute(VALID_INPUT).catch(() => {});
+
+      expect(mockPasswordService.hashPassword).not.toHaveBeenCalled();
+      expect(mockUserRepository.save).not.toHaveBeenCalled();
+    });
+  });
+
   // ── Happy path ─────────────────────────────────────────────
 
-  describe('when user exists', () => {
+  describe('when user exists and current password is correct', () => {
+    it('should verify the current password against the stored hash', async () => {
+      await sut.execute(VALID_INPUT);
+
+      expect(mockPasswordService.verifyPassword).toHaveBeenCalledWith(
+        VALID_INPUT.currentPassword,
+        buildExistingUser().getPasswordHash(),
+      );
+    });
+
     it('should hash the new password', async () => {
       await sut.execute(VALID_INPUT);
 
@@ -84,11 +114,8 @@ describe('ChangePasswordUseCase', () => {
     it('should save the user with the new password hash', async () => {
       await sut.execute(VALID_INPUT);
 
-      // Verificamos que el usuario que se guarda tiene el nuevo hash
       expect(mockUserRepository.save).toHaveBeenCalledWith(
-        expect.objectContaining({
-          passwordHash: NEW_HASH,
-        }),
+        expect.objectContaining({ passwordHash: NEW_HASH }),
       );
     });
 

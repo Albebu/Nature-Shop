@@ -1,6 +1,7 @@
 import type { LoginDto } from '@application/dtos/login.dto.js';
 import { LoginUseCase } from '@application/use-cases/login.use-case.js';
 import { User } from '@domain/entities/user.js';
+
 import type { PasswordService } from '@domain/ports/password.service.js';
 import type { RefreshTokenRepository } from '@domain/ports/refresh-token.repository.js';
 import type { TokenService } from '@domain/ports/token.service.js';
@@ -105,6 +106,42 @@ describe('LoginUseCase', () => {
 
       expect(mockTokenService.generate).not.toHaveBeenCalled();
       expect(mockTokenService.generateRefreshToken).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('when user is inactive', () => {
+    it('should throw UnauthorizedError', async () => {
+      const inactiveUser = User.fromDB({
+        id: 'user-123',
+        tenantId: 'tenant-456',
+        firstName: 'Alex',
+        lastName: 'Bellosta',
+        email: VALID_INPUT.email,
+        passwordHash: '$argon2id$hashed',
+        userType: 'CUSTOMER',
+        isActive: false,
+      });
+      vi.mocked(mockUserRepository.findByEmail).mockResolvedValue(inactiveUser);
+
+      await expect(sut.execute(VALID_INPUT)).rejects.toThrow(UnauthorizedError);
+    });
+
+    it('should NOT verify the password', async () => {
+      const inactiveUser = User.fromDB({
+        id: 'user-123',
+        tenantId: 'tenant-456',
+        firstName: 'Alex',
+        lastName: 'Bellosta',
+        email: VALID_INPUT.email,
+        passwordHash: '$argon2id$hashed',
+        userType: 'CUSTOMER',
+        isActive: false,
+      });
+      vi.mocked(mockUserRepository.findByEmail).mockResolvedValue(inactiveUser);
+
+      await sut.execute(VALID_INPUT).catch(() => {});
+
+      expect(mockPasswordService.verifyPassword).not.toHaveBeenCalled();
     });
   });
 

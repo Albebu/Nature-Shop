@@ -51,24 +51,32 @@ describe('LogoutUseCase', () => {
       await sut.execute('unknown-token').catch(() => {});
 
       expect(mockRefreshTokenRepository.revokeByToken).not.toHaveBeenCalled();
+      expect(mockRefreshTokenRepository.revokeByUserId).not.toHaveBeenCalled();
     });
   });
 
   // ── Happy path ─────────────────────────────────────────────
 
   describe('when refresh token exists', () => {
-    it('should revoke the token', async () => {
+    it('should revoke ALL tokens for the user — not just the provided one', async () => {
       await sut.execute(VALID_REFRESH_TOKEN.getToken());
 
-      expect(mockRefreshTokenRepository.revokeByToken).toHaveBeenCalledWith(
-        VALID_REFRESH_TOKEN.getToken(),
+      // revokeByUserId closes all sessions across all devices
+      expect(mockRefreshTokenRepository.revokeByUserId).toHaveBeenCalledWith(
+        VALID_REFRESH_TOKEN.getUserId(),
       );
+    });
+
+    it('should NOT call revokeByToken — all sessions are revoked at once', async () => {
+      await sut.execute(VALID_REFRESH_TOKEN.getToken());
+
+      expect(mockRefreshTokenRepository.revokeByToken).not.toHaveBeenCalled();
     });
 
     it('should revoke only once', async () => {
       await sut.execute(VALID_REFRESH_TOKEN.getToken());
 
-      expect(mockRefreshTokenRepository.revokeByToken).toHaveBeenCalledTimes(1);
+      expect(mockRefreshTokenRepository.revokeByUserId).toHaveBeenCalledTimes(1);
     });
   });
 });

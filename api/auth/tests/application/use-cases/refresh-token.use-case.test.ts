@@ -159,6 +159,20 @@ describe('RefreshTokenUseCase', () => {
       );
     });
 
+    it('should persist the new refresh token', async () => {
+      await sut.execute(VALID_REFRESH_TOKEN.getToken());
+
+      // El nuevo token tiene que guardarse en DB — si no, el cliente no
+      // podrá volver a refrescarlo la próxima vez
+      expect(mockRefreshTokenRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: VALID_REFRESH_TOKEN.getUserId(),
+          token: NEW_REFRESH_TOKEN,
+          expiresAt: expect.any(Date),
+        }),
+      );
+    });
+
     it('should return both new tokens', async () => {
       const result = await sut.execute(VALID_REFRESH_TOKEN.getToken());
 
