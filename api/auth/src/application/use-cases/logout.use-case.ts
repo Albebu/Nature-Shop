@@ -6,7 +6,6 @@ export class LogoutUseCase {
 
   async execute(refreshToken: string): Promise<void> {
     const tokenExists = await this.refreshTokenRepository.findByToken(refreshToken);
-    console.log('LogoutUseCase: Found token:', tokenExists);
     if (!tokenExists) {
       throw new UnauthorizedError();
     }

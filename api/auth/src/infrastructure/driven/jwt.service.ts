@@ -7,10 +7,10 @@ function isTokenPayload(value: unknown): value is TokenPayload {
   return (
     typeof value === 'object' &&
     value !== null &&
-    'id' in value &&
+    'userId' in value &&
     'userType' in value &&
-    typeof (value as TokenPayload).id === 'string' &&
-    typeof (value as TokenPayload).userType === 'string'
+    typeof value.userId === 'string' &&
+    typeof value.userType === 'string'
   );
 }
 
@@ -33,6 +33,14 @@ export class JwtService implements TokenService {
       throw new Error('Invalid token payload');
     }
     return result;
+  }
+
+  verifyRefreshToken(token: string): TokenPayload {
+    const result = jwt.verify(token, ENV.REFRESH_TOKEN_SECRET);
+    if (typeof result === 'object' && 'userId' in result && typeof result['userId'] === 'string') {
+      return result as TokenPayload;
+    }
+    throw new Error('Invalid refresh token payload');
   }
 
   decode(token: string): TokenPayload {

@@ -116,9 +116,9 @@ export class User {
     return this.passwordHash;
   }
 
-  getTokenPayload(): { id: string; userType: UserType; tenantId: User['tenantId'] } {
+  getTokenPayload(): { userId: string; userType: UserType; tenantId: User['tenantId'] } {
     return {
-      id: this.id,
+      userId: this.id,
       userType: this.userType,
       tenantId: this.tenantId,
     };

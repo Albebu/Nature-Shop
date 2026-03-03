@@ -134,8 +134,17 @@ export class AuthController {
       throw new UnauthorizedError();
     }
 
-    await this.changePasswordUseCase.execute({ ...parsed.data, userId: req.user.id });
+    const { userId } = req.user;
+    await this.changePasswordUseCase.execute({ ...parsed.data, userId });
 
     res.status(200).json({ message: 'Password changed successfully' });
+  }
+
+  getProfile(req: Request, res: Response): void {
+    if (!req.user) {
+      throw new UnauthorizedError();
+    }
+
+    res.status(200).json({ user: req.user });
   }
 }

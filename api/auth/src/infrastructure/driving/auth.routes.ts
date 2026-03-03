@@ -18,6 +18,9 @@ export function createAuthRouter(
   router.post('/change-password', authMiddleware, (req, res) =>
     controller.changePassword(req, res),
   );
+  router.get('/me', authMiddleware, (req, res) => {
+    controller.getProfile(req, res);
+  });
 
   return router;
 }
