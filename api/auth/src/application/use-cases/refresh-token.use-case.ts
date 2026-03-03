@@ -1,4 +1,5 @@
-import { ForbiddenError, UnauthorizedError } from '@ecommerce/shared';
+import { ForbiddenError, SEVEN_DAYS_IN_MS, UnauthorizedError } from '@ecommerce/shared';
+import { RefreshToken } from '../../domain/entities/refresh-token.js';
 import type { RefreshTokenRepository } from '../../domain/ports/refresh-token.repository.js';
 import type { TokenService } from '../../domain/ports/token.service.js';
 import type { UserRepository } from '../../domain/ports/user.repository.js';
@@ -29,13 +30,23 @@ export class RefreshTokenUseCase {
     }
 
     const newToken = this.tokenService.generate(user.getTokenPayload());
-    const newRefreshToken = this.tokenService.generateRefreshToken(tokenExists.getUserId());
+    const newRefreshTokenString = this.tokenService.generateRefreshToken(tokenExists.getUserId());
 
+    // Revoke old token first, then persist the new one
     await this.refreshTokenRepository.revokeByToken(tokenExists.getToken());
+
+    await this.refreshTokenRepository.save(
+      RefreshToken.create({
+        id: crypto.randomUUID(),
+        userId: tokenExists.getUserId(),
+        token: newRefreshTokenString,
+        expiresAt: new Date(Date.now() + SEVEN_DAYS_IN_MS),
+      }),
+    );
 
     return {
       token: newToken,
-      refreshToken: newRefreshToken,
+      refreshToken: newRefreshTokenString,
     };
   }
 }

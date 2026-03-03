@@ -10,6 +10,7 @@ export class LogoutUseCase {
       throw new UnauthorizedError();
     }
 
-    await this.refreshTokenRepository.revokeByToken(refreshToken);
+    // Revoke ALL tokens for this user — closes all active sessions
+    await this.refreshTokenRepository.revokeByUserId(tokenExists.getUserId());
   }
 }

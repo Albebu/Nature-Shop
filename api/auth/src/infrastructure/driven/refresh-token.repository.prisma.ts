@@ -18,7 +18,7 @@ export class RefreshTokenRepositoryPrisma implements RefreshTokenRepository {
 
   async findByToken(token: string): Promise<RefreshToken | null> {
     const record = await this.db.refreshToken.findUnique({
-      where: { token },
+      where: { token, revokedAt: null },
     });
 
     if (!record) return null;

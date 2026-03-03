@@ -1,4 +1,4 @@
-import { NotFoundError } from '@ecommerce/shared';
+import { NotFoundError, UnauthorizedError } from '@ecommerce/shared';
 import type { PasswordService } from '../../domain/ports/password.service.js';
 import type { UserRepository } from '../../domain/ports/user.repository.js';
 import type { ChangePasswordDto } from '../dtos/change-password.dto.js';
@@ -13,6 +13,15 @@ export class ChangePasswordUseCase {
     const user = await this.userRepository.findById(input.userId);
     if (!user) {
       throw new NotFoundError();
+    }
+
+    const isCurrentPasswordValid = await this.passwordService.verifyPassword(
+      input.currentPassword,
+      user.getPasswordHash(),
+    );
+
+    if (!isCurrentPasswordValid) {
+      throw new UnauthorizedError();
     }
 
     const newPasswordHash = await this.passwordService.hashPassword(input.newPassword);

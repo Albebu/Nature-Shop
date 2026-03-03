@@ -17,7 +17,7 @@ export class LoginUseCase {
   async execute(input: LoginDto): Promise<LoginResponseDto> {
     const userExists = await this.userRepository.findByEmail(input.email);
 
-    if (!userExists) {
+    if (!userExists?.getIsActive()) {
       throw new UnauthorizedError();
     }
 

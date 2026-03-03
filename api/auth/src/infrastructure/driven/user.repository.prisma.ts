@@ -7,14 +7,14 @@ export class UserRepositoryPrisma implements UserRepository {
 
   async findById(id: string): Promise<User | null> {
     const user = await this.db.user.findUnique({
-      where: { id },
+      where: { id, isActive: true, deletedAt: null },
     });
     return user ? User.fromDB(user) : null;
   }
 
   async findByEmail(email: string): Promise<User | null> {
     const user = await this.db.user.findUnique({
-      where: { email },
+      where: { email, isActive: true, deletedAt: null },
     });
     return user ? User.fromDB(user) : null;
   }
@@ -23,17 +23,21 @@ export class UserRepositoryPrisma implements UserRepository {
     await this.db.user.upsert({
       where: { id: user.getId() },
       update: {
+        tenantId: user.getTenantId() ?? null,
         firstName: user.getFirstName(),
         lastName: user.getLastName(),
         email: user.getEmail(),
         passwordHash: user.getPasswordHash(),
+        userType: user.getUserType(),
       },
       create: {
         id: user.getId(),
+        tenantId: user.getTenantId() ?? null,
         firstName: user.getFirstName(),
         lastName: user.getLastName(),
         email: user.getEmail(),
         passwordHash: user.getPasswordHash(),
+        userType: user.getUserType(),
       },
     });
   }

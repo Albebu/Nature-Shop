@@ -1,5 +1,5 @@
-import { EMAIL_REGEX } from '@ecommerce/shared';
 import type { UserType } from '@ecommerce/shared';
+import { EMAIL_REGEX } from '@ecommerce/shared';
 import { InvalidEmailError } from '../errors/invalid-email.error.js';
 
 export class User {
@@ -10,6 +10,7 @@ export class User {
   private email: string;
   private passwordHash: string;
   private userType: UserType;
+  private active: boolean;
 
   private constructor({
     id,
@@ -19,6 +20,7 @@ export class User {
     email,
     passwordHash,
     userType,
+    isActive = true,
   }: {
     id: User['id'];
     tenantId: User['tenantId'];
@@ -27,6 +29,7 @@ export class User {
     email: User['email'];
     passwordHash: User['passwordHash'];
     userType: User['userType'];
+    isActive?: boolean;
   }) {
     this.id = id;
     this.tenantId = tenantId;
@@ -35,6 +38,7 @@ export class User {
     this.email = email;
     this.passwordHash = passwordHash;
     this.userType = userType;
+    this.active = isActive;
   }
 
   static create({
@@ -65,6 +69,7 @@ export class User {
       email,
       passwordHash,
       userType: 'CUSTOMER',
+      isActive: true,
     });
   }
 
@@ -76,6 +81,7 @@ export class User {
     email,
     passwordHash,
     userType,
+    isActive = true,
   }: {
     id: User['id'];
     tenantId: User['tenantId'];
@@ -84,8 +90,9 @@ export class User {
     email: User['email'];
     passwordHash: User['passwordHash'];
     userType: User['userType'];
+    isActive?: boolean;
   }): User {
-    return new User({ id, tenantId, firstName, lastName, email, passwordHash, userType });
+    return new User({ id, tenantId, firstName, lastName, email, passwordHash, userType, isActive });
   }
 
   setPasswordHash(passwordHash: string): void {
@@ -116,11 +123,19 @@ export class User {
     return this.passwordHash;
   }
 
+  getIsActive(): boolean {
+    return this.active;
+  }
+
   getTokenPayload(): { userId: string; userType: UserType; tenantId: User['tenantId'] } {
     return {
       userId: this.id,
       userType: this.userType,
       tenantId: this.tenantId,
     };
+  }
+
+  getUserType(): User['userType'] {
+    return this.userType;
   }
 }
