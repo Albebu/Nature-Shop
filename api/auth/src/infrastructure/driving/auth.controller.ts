@@ -7,27 +7,12 @@ import type { LogoutUseCase } from '../../application/use-cases/logout.use-case.
 import type { RefreshTokenUseCase } from '../../application/use-cases/refresh-token.use-case.js';
 import type { RegisterUseCase } from '../../application/use-cases/register.use-case.js';
 import { ENV } from '../../env.js';
-
-const registerSchema = z.object({
-  firstName: z.string().min(1),
-  lastName: z.string().min(1),
-  email: z.email(),
-  password: z.string().min(8),
-});
-
-const loginSchema = z.object({
-  email: z.email(),
-  password: z.string().min(1),
-});
-
-const refreshTokenSchema = z.object({
-  refreshToken: z.string().min(1),
-});
-
-const changePasswordSchema = z.object({
-  currentPassword: z.string().min(1),
-  newPassword: z.string().min(8),
-});
+import {
+  changePasswordSchema,
+  loginSchema,
+  refreshTokenCookieSchema,
+  registerSchema,
+} from '../../interfaces/schemas/auth.schemas.js';
 
 export class AuthController {
   constructor(
@@ -85,7 +70,7 @@ export class AuthController {
   }
 
   async refreshToken(req: Request, res: Response): Promise<void> {
-    const parsed = refreshTokenSchema.safeParse(req.cookies);
+    const parsed = refreshTokenCookieSchema.safeParse(req.cookies);
 
     if (!parsed.success) {
       res.status(401).json({ message: 'Refresh token is required' });
@@ -109,7 +94,7 @@ export class AuthController {
   }
 
   async logout(req: Request, res: Response): Promise<void> {
-    const parsed = refreshTokenSchema.safeParse(req.cookies);
+    const parsed = refreshTokenCookieSchema.safeParse(req.cookies);
 
     if (!parsed.success) {
       throw new ZodValidationError(z.flattenError(parsed.error));

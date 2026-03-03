@@ -1,6 +1,9 @@
 import { createAuthMiddleware, createErrorMiddleware } from '@ecommerce/shared';
 import cookieParser from 'cookie-parser';
 import express, { type Express } from 'express';
+import type { IncomingMessage, ServerResponse } from 'node:http';
+import { pinoHttp } from 'pino-http';
+import { generateOpenApiSpec } from './interfaces/openapi/spec.js';
 import { ChangePasswordUseCase } from './application/use-cases/change-password.use-case.js';
 import { LoginUseCase } from './application/use-cases/login.use-case.js';
 import { LogoutUseCase } from './application/use-cases/logout.use-case.js';
@@ -21,6 +24,20 @@ export function createApp(): Express {
 
   const logger = getLogger();
   const errorMiddleware = createErrorMiddleware(logger);
+
+  // HTTP request logging — usa el mismo logger de pino para consistencia
+  app.use(
+    pinoHttp({
+      logger,
+      // No loguear el health check — ruido innecesario
+      autoLogging: { ignore: (req: IncomingMessage) => req.url === '/health' },
+      // Campos customizados en la respuesta
+      customSuccessMessage: (req: IncomingMessage, res: ServerResponse) =>
+        `${req.method ?? 'UNKNOWN'} ${req.url ?? '/'} completed with ${String(res.statusCode)}`,
+      customErrorMessage: (req: IncomingMessage, res: ServerResponse, err: Error) =>
+        `${req.method ?? 'UNKNOWN'} ${req.url ?? '/'} failed with ${String(res.statusCode)}: ${err.message}`,
+    }),
+  );
 
   app.use(express.json());
   app.use(cookieParser());
@@ -72,6 +89,11 @@ export function createApp(): Express {
 
   app.get('/health', (_req, res) => {
     res.status(200).json({ status: 'ok' });
+  });
+
+  // OpenAPI spec — disponible en desarrollo, útil para Swagger UI, Postman, etc.
+  app.get('/api/auth/openapi.json', (_req, res) => {
+    res.status(200).json(generateOpenApiSpec());
   });
 
   app.use(errorMiddleware);
