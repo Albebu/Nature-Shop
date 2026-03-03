@@ -57,8 +57,7 @@ export default tseslint.config(
     },
   },
 
-
-  // Ignore compiled output and config files
+  // Ignore compiled output and tooling config files
   {
     ignores: [
       '**/dist/**',
@@ -68,6 +67,8 @@ export default tseslint.config(
       '**/*.mjs',
       '**/*.cjs',
       'eslint.config.js',
+      '**/vitest.config.ts',
+      '**/prisma.config.ts',
     ],
   },
 );

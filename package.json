@@ -17,6 +17,7 @@
     "format": "prettier --write \"**/*.{ts,json,yaml,yml}\"",
     "format:check": "prettier --check \"**/*.{ts,json,yaml,yml}\"",
     "typecheck": "pnpm -r typecheck",
+    "dev": "pnpm run docker:up && pnpm -r dev",
     "test": "pnpm -r test",
     "test:coverage": "pnpm -r test:coverage",
     "build": "pnpm -r build",

@@ -1,11 +1,11 @@
 import { createAuthMiddleware, createErrorMiddleware } from '@ecommerce/shared';
 import cookieParser from 'cookie-parser';
 import express, { type Express } from 'express';
+import { ChangePasswordUseCase } from './application/use-cases/change-password.use-case.js';
 import { LoginUseCase } from './application/use-cases/login.use-case.js';
 import { LogoutUseCase } from './application/use-cases/logout.use-case.js';
 import { RefreshTokenUseCase } from './application/use-cases/refresh-token.use-case.js';
 import { RegisterUseCase } from './application/use-cases/register.use-case.js';
-import { ChangePasswordUseCase } from './application/use-cases/change-password.use-case.js';
 import { BcryptService } from './infrastructure/driven/bcrypt.service.js';
 import { JwtService } from './infrastructure/driven/jwt.service.js';
 import { getLogger } from './infrastructure/driven/logger.instance.js';
