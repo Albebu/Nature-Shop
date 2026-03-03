@@ -171,8 +171,9 @@ describe('RegisterUseCase', () => {
 
       expect(mockTokenService.generate).toHaveBeenCalledWith(
         expect.objectContaining({
-          id: expect.any(String), // el ID del usuario
+          userId: expect.any(String),
           userType: 'CUSTOMER',
+          tenantId: expect.any(String),
         }),
       );
     });
