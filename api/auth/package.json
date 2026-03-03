@@ -12,7 +12,6 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "eslint . --ext .ts",
     "test:coverage": "vitest run --coverage",
     "prisma:generate": "pnpm dlx prisma generate",
     "prisma:migrate": "pnpm dlx prisma migrate dev"
@@ -24,6 +23,7 @@
     "@ecommerce/shared": "workspace:*",
     "@prisma/adapter-pg": "^7.4.1",
     "@prisma/client": "^7.4.1",
+    "@scalar/express-api-reference": "^0.8.48",
     "argon2": "^0.44.0",
     "bcrypt": "^6.0.0",
     "cookie-parser": "^1.4.7",

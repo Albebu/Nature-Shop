@@ -1,3 +1,4 @@
+import { apiReference } from '@scalar/express-api-reference';
 import { createAuthMiddleware, createErrorMiddleware } from '@ecommerce/shared';
 import cookieParser from 'cookie-parser';
 import express, { type Express } from 'express';
@@ -91,10 +92,13 @@ export function createApp(): Express {
     res.status(200).json({ status: 'ok' });
   });
 
-  // OpenAPI spec — disponible en desarrollo, útil para Swagger UI, Postman, etc.
+  // OpenAPI spec JSON — fuente de verdad para Scalar y cualquier herramienta externa
   app.get('/api/auth/openapi.json', (_req, res) => {
     res.status(200).json(generateOpenApiSpec());
   });
+
+  // Scalar UI — documentación interactiva en http://localhost:<PORT>/api/auth/docs
+  app.use('/api/auth/docs', apiReference({ url: '/api/auth/openapi.json' }));
 
   app.use(errorMiddleware);
 
