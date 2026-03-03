@@ -18,8 +18,13 @@ export function createAuthMiddleware(verify: VerifyToken) {
       throw new UnauthorizedError();
     }
 
-    const payload = verify(parsed.data.accessToken);
-    req.user = payload;
+    try {
+      req.user = verify(parsed.data.accessToken);
+    } catch {
+      // TokenExpiredError, JsonWebTokenError, etc. → always 401, never 500
+      throw new UnauthorizedError();
+    }
+
     next();
   };
 }
