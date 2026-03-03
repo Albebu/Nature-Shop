@@ -1,7 +1,7 @@
 export type UserType = 'CUSTOMER' | 'EMPLOYEE';
 
 export interface TokenPayload {
-  id: string;
+  userId: string;
   userType: UserType;
   tenantId: string | null | undefined;
 }

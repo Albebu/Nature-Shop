@@ -6,25 +6,19 @@ import type { TokenPayload } from '../types/user.types.js';
 
 type VerifyToken = (token: string) => TokenPayload;
 
-const refreshTokenSchema = z.object({
-  refreshToken: z.string().min(1),
+const cookieSchema = z.object({
+  accessToken: z.string().min(1),
 });
 
 export function createAuthMiddleware(verify: VerifyToken) {
   return function authMiddleware(req: Request, _res: Response, next: NextFunction): void {
-    const parsed = refreshTokenSchema.safeParse(req.cookies);
+    const parsed = cookieSchema.safeParse(req.cookies);
 
     if (!parsed.success) {
       throw new UnauthorizedError();
     }
 
-    const token = parsed.data.refreshToken;
-
-    if (!token) {
-      throw new UnauthorizedError();
-    }
-
-    const payload = verify(token);
+    const payload = verify(parsed.data.accessToken);
     req.user = payload;
     next();
   };
