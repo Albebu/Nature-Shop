@@ -30,13 +30,33 @@ export function createApp(): Express {
   app.use(
     pinoHttp({
       logger,
-      // No loguear el health check — ruido innecesario
-      autoLogging: { ignore: (req: IncomingMessage) => req.url === '/health' },
-      // Campos customizados en la respuesta
+      // No loguear el health check ni los assets de docs — ruido innecesario
+      autoLogging: {
+        ignore: (req: IncomingMessage) =>
+          req.url === '/health' || (req.url?.startsWith('/api/auth/docs') ?? false),
+      },
+      // Log level basado en status code — 4xx warn, 5xx error, resto info
+      customLogLevel: (_req: IncomingMessage, res: ServerResponse, err: unknown) => {
+        if (err || res.statusCode >= 500) return 'error';
+        if (res.statusCode >= 400) return 'warn';
+        return 'info';
+      },
+      // Serializers: solo los campos útiles, no el dump completo
+      serializers: {
+        req: (req: Record<string, unknown>) => ({
+          method: req['method'],
+          url: req['url'],
+          remoteAddress: req['remoteAddress'],
+        }),
+        res: (res: Record<string, unknown>) => ({
+          statusCode: res['statusCode'],
+        }),
+      },
+      // Mensajes concisos
       customSuccessMessage: (req: IncomingMessage, res: ServerResponse) =>
-        `${req.method ?? 'UNKNOWN'} ${req.url ?? '/'} completed with ${String(res.statusCode)}`,
+        `${req.method ?? 'UNKNOWN'} ${req.url ?? '/'} ${String(res.statusCode)}`,
       customErrorMessage: (req: IncomingMessage, res: ServerResponse, err: Error) =>
-        `${req.method ?? 'UNKNOWN'} ${req.url ?? '/'} failed with ${String(res.statusCode)}: ${err.message}`,
+        `${req.method ?? 'UNKNOWN'} ${req.url ?? '/'} ${String(res.statusCode)}: ${err.message}`,
     }),
   );
 

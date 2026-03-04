@@ -25,7 +25,9 @@ export function createErrorMiddleware(logger: Logger) {
     }
 
     if (err instanceof DomainError) {
-      logger.warn({ err, statusCode: err.statusCode }, err.message);
+      const endpoint = extractEndpointFromRequest(req);
+      // No { err } — DomainErrors son errores esperados, el stack trace es ruido
+      logger.warn({ statusCode: err.statusCode, endpoint }, err.message);
 
       res.status(err.statusCode).json({
         error: err.name,
