@@ -135,7 +135,7 @@ STATUS: PASSED | FAILED | WARNINGS
 [If FAILED or WARNINGS:]
 
 VIOLATIONS:
-- [LAYER VIOLATION] file:line — <importing file> (layer: X) imports from <imported> (layer: Y). 
+- [LAYER VIOLATION] file:line — <importing file> (layer: X) imports from <imported> (layer: Y).
   Fix: inject <interface> through constructor instead.
 
 - [NAMING] file — expected name: <correct-name>.ts
