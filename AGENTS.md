@@ -15,8 +15,10 @@ Target: Backend development first, then frontend. TDD with 90%+ coverage.
 - Validation: Zod 4
 - Testing: Vitest + Supertest
 - Logging: Pino
-- Message Broker: Kafka (planned)
-- Container Orchestration: Kubernetes (planned)
+- Message Broker: RabbitMQ 4 (amqplib)
+- Email Provider: Resend
+- API Docs: Scalar (OpenAPI)
+- Container Orchestration: Docker + Kubernetes
 
 ---
 
@@ -26,26 +28,102 @@ Target: Backend development first, then frontend. TDD with 90%+ coverage.
 ```
 /
 ├── api/           # Microservicios backend
-│   ├── auth/      # Autenticación JWT + refresh tokens
-│   └── orders/    # Gestión de pedidos
-├── ui/            # Frontend (Next.js - planned)
-├── shared/        # Código compartido entre servicios
-└── k8s/           # Kubernetes manifests
+│   ├── auth/      # Autenticación JWT + refresh tokens + verificación email
+│   ├── email/     # Servicio de emails (consumer RabbitMQ + Resend)
+│   └── orders/    # Gestión de pedidos (planned)
+├── shared/        # Código compartido entre servicios (@ecommerce/shared)
+├── k8s/           # Kubernetes manifests
+└── docker-compose.yml  # PostgreSQL + RabbitMQ
 ```
 
 **Hexagonal Architecture (Ports & Adapters) per Service:**
 ```
 api/auth/src/
-├── domain/        # Entidades, value objects, puertos (interfaces)
-├── application/   # Casos de uso, servicios de aplicación
-├── infrastructure/# Adaptadores (DB, APIs externas, repositories)
-└── interfaces/    # Controladores, routes, DTOs
+├── domain/        # Entidades, value objects, puertos (interfaces), errores
+├── application/   # Casos de uso, DTOs (Zod schemas)
+└── infrastructure/
+    ├── driving/   # Adaptadores entrantes: controllers, routes
+    └── driven/    # Adaptadores salientes: Prisma repos, JWT, RabbitMQ, Pino
+```
+
+```
+api/email/src/
+├── domain/        # Puertos: EmailSender, EventConsumer, Logger
+├── application/   # Casos de uso: HandleUserRegisteredUseCase
+└── infrastructure/
+    ├── driving/   # (vacío — no tiene HTTP, solo consume eventos)
+    └── driven/    # RabbitMQ consumer, Resend adapter, Console adapter, Pino
 ```
 
 **Path Aliases (tsconfig.json):**
 - `@domain/*` → `src/domain/*`
 - `@application/*` → `src/application/*`
 - `@infrastructure/*` → `src/infrastructure/*`
+
+---
+
+## Event-Driven Architecture
+
+### RabbitMQ Topology
+- **Exchange**: `user.events` (type: topic, durable)
+- **Queue**: `email.user.registered` (durable)
+- **Routing Key**: `user.registered`
+- **Binding**: `user.events` → `email.user.registered` via `user.registered`
+
+### Event Contracts (defined in `@ecommerce/shared`)
+```typescript
+interface DomainEvent<T> {
+  type: string;
+  payload: T;
+  occurredAt: string;
+  correlationId: string;
+}
+
+interface UserRegisteredPayload {
+  userId: string;
+  email: string;
+  firstName: string;
+  verificationToken: string;
+}
+```
+
+### Event Flow Pattern
+```
+Use Case → EventPublisher.publish(event) → RabbitMQ → EventConsumer → Handler Use Case
+```
+
+**Critical rules:**
+- Event publishing is **fire & forget** — failures must NOT break the originating operation
+- Wrap `eventPublisher.publish()` in try/catch, log errors, continue
+- Malformed messages are **ack'd** (not requeued) — prevents poison pill loops
+- EventPublisher port is in `domain/ports/` — RabbitMQ adapter is in `infrastructure/driven/`
+
+### Adding New Events
+1. Define payload type in `shared/src/types/events.ts`
+2. Export from `shared/src/index.ts`
+3. Add routing key constant in shared
+4. Publisher: call `eventPublisher.publish()` in use case
+5. Consumer: create handler use case + subscribe in `app.ts`
+
+---
+
+## Services
+
+### Auth Service (`@ecommerce/auth-service`)
+- **Port**: 8080 (default)
+- **API Docs**: http://localhost:8080/api/auth/docs (Scalar)
+- **Database**: PostgreSQL (`nature_shop_auth`)
+- **Entities**: User, RefreshToken, VerificationToken
+- **Use Cases**: Register, Login, Logout, RefreshToken, ChangePassword, VerifyEmail
+- **Events Published**: `user.registered` (after registration)
+- **RabbitMQ**: Optional — service works without it (noop publisher logs warning)
+
+### Email Service (`@ecommerce/email-service`)
+- **No HTTP server** — only consumes RabbitMQ events
+- **Database**: None (stateless)
+- **Events Consumed**: `user.registered`
+- **Adapters**: ResendEmailSender (production), ConsoleEmailSender (development)
+- **RabbitMQ**: Required — service exits if connection fails
 
 ---
 
@@ -63,8 +141,9 @@ pnpm test:coverage     # Run tests with coverage report
 pnpm build             # Build all services
 ```
 
-### Service Level (e.g., api/auth)
+### Service Level
 ```bash
+# Auth service
 pnpm --filter @ecommerce/auth-service dev          # Development with hot reload
 pnpm --filter @ecommerce/auth-service build        # Compile TypeScript
 pnpm --filter @ecommerce/auth-service start        # Run compiled code
@@ -72,6 +151,19 @@ pnpm --filter @ecommerce/auth-service typecheck    # Type check only
 pnpm --filter @ecommerce/auth-service test         # Run all tests once
 pnpm --filter @ecommerce/auth-service test:watch   # Watch mode
 pnpm --filter @ecommerce/auth-service test:coverage # Coverage report
+
+# Email service
+pnpm --filter @ecommerce/email-service dev          # Development with hot reload
+pnpm --filter @ecommerce/email-service test         # Run all tests
+pnpm --filter @ecommerce/email-service test:coverage # Coverage report
+```
+
+### Infrastructure
+```bash
+docker compose up -d                # Start PostgreSQL + RabbitMQ
+docker compose up -d rabbitmq       # Start only RabbitMQ
+docker compose ps                   # Check running containers
+docker compose down                 # Stop everything
 ```
 
 **Running a Single Test:**
@@ -89,7 +181,7 @@ npx vitest run -t "should create user"
 **Prisma Commands:**
 ```bash
 pnpm --filter @ecommerce/auth-service exec prisma generate   # Generate client
-pnpm --filter @ecommerce/auth-service exec prisma migrate dev --name init
+pnpm --filter @ecommerce/auth-service exec prisma migrate dev --name <name>
 pnpm --filter @ecommerce/auth-service exec prisma studio     # GUI
 ```
 
@@ -129,6 +221,15 @@ import { CreateUserUseCase } from '@application/use-cases/create-user';
 import { User } from '../../domain/entities/user';
 ```
 
+**Shared package imports:**
+```typescript
+// Types — use import type
+import type { DomainEvent, UserRegisteredPayload } from '@ecommerce/shared';
+
+// Values — regular import
+import { USER_EVENTS_EXCHANGE, USER_REGISTERED_ROUTING_KEY } from '@ecommerce/shared';
+```
+
 ### Naming Conventions
 
 | Element | Convention | Example |
@@ -141,6 +242,7 @@ import { User } from '../../domain/entities/user';
 | Files (classes) | kebab-case | `user.repository.ts`, `create-user.use-case.ts` |
 | Files (tests) | .test.ts suffix | `user.test.ts`, `auth.service.test.ts` |
 | Environment vars | SCREAMING_SNAKE_CASE | `DATABASE_URL`, `JWT_SECRET` |
+| Event types | dot.notation | `user.registered`, `order.created` |
 
 ### Function Return Types
 
@@ -163,20 +265,14 @@ export function createUser(data: CreateUserDto) {
 
 ### Error Handling
 
-**Use custom error classes for domain errors:**
+**Use custom error classes extending DomainError from shared:**
 ```typescript
-// Domain errors
-export class UserNotFoundError extends Error {
-  constructor(userId: string) {
-    super(`User with id ${userId} not found`);
-    this.name = 'UserNotFoundError';
-  }
-}
+import { DomainError } from '@ecommerce/shared';
 
-export class InvalidCredentialsError extends Error {
+export class VerificationTokenExpiredError extends DomainError {
   constructor() {
-    super('Invalid email or password');
-    this.name = 'InvalidCredentialsError';
+    super('Verification token has expired', 400);
+    this.name = 'VerificationTokenExpiredError';
   }
 }
 ```
@@ -203,25 +299,22 @@ catch (error: any) {
 
 **Define schemas in dedicated files, infer types:**
 ```typescript
-// schemas/create-user.schema.ts
+// dtos/verify-email.dto.ts
 import { z } from 'zod';
 
-export const createUserSchema = z.object({
-  email: z.email(),
-  password: z.string().min(8).max(100),
-  name: z.string().min(1).max(100),
+export const verifyEmailSchema = z.object({
+  token: z.string().min(1),
 });
 
-export type CreateUserDto = z.infer<typeof createUserSchema>;
+export type VerifyEmailDto = z.infer<typeof verifyEmailSchema>;
 ```
 
 **Validate at controller level:**
 ```typescript
-// controllers/user.controller.ts
-import { createUserSchema } from '../schemas/create-user.schema';
+import { verifyEmailSchema } from '../dtos/verify-email.dto';
 
-export async function createUser(req: Request, res: Response): Promise<void> {
-  const validatedData = createUserSchema.parse(req.body);
+export async function verifyEmail(req: Request, res: Response): Promise<void> {
+  const validatedData = verifyEmailSchema.parse(req.query);
   // ... use validatedData
 }
 ```
@@ -263,9 +356,24 @@ describe('User', () => {
 });
 ```
 
+### Mocking Ports
+
+All ports are mocked with `vi.fn()` in tests:
+```typescript
+const mockEventPublisher: EventPublisher = {
+  publish: vi.fn(),
+};
+
+const mockVerificationTokenRepo: VerificationTokenRepository = {
+  save: vi.fn(),
+  findByToken: vi.fn(),
+};
+```
+
 ### Coverage Requirement
 
 **Minimum: 90% coverage** — PRs below this threshold will fail.
+Current coverage: 100% (auth + email services).
 
 ```bash
 pnpm test:coverage  # Check coverage before pushing
@@ -326,6 +434,12 @@ export class UserRepositoryPrisma implements UserRepository {
 }
 ```
 
+### Current Models (Auth Service)
+- **Tenant** — Empresas (multitenant)
+- **User** — Employees + Customers, includes `emailVerifiedAt`
+- **RefreshToken** — JWT refresh tokens with revocation
+- **VerificationToken** — Email verification tokens (single use, 24h expiry)
+
 ---
 
 ## Commit Conventions
@@ -340,21 +454,38 @@ type(scope): description
 
 # Examples:
 feat(auth): add refresh token rotation
+feat(email): create email microservice with Resend
+feat(infra): add RabbitMQ broker to docker-compose
 fix(orders): correct total calculation
 test(auth): add login integration tests
 refactor(auth): extract token validation to middleware
 ```
 
+**Scopes:** `auth`, `email`, `orders`, `shared`, `infra`
+
 ---
 
 ## Environment Variables
 
-Required per service (check `.env.example` when available):
+### Auth Service (`api/auth/.env`)
 - `DATABASE_URL` — PostgreSQL connection string
-- `JWT_SECRET` — Secret for signing tokens
-- `JWT_EXPIRES_IN` — Token expiration (e.g., "15m", "7d")
-- `REFRESH_TOKEN_EXPIRES_IN` — Refresh token expiration
+- `PORT` — Server port (default: 3000)
+- `JWT_SECRET` — Secret for signing access tokens
+- `REFRESH_TOKEN_SECRET` — Secret for signing refresh tokens
+- `RABBITMQ_URL` — RabbitMQ connection (optional — works without it)
 - `LOG_LEVEL` — Pino log level (default: "info")
+- `SALT` — Bcrypt rounds (default: 10)
+
+### Email Service (`api/email/.env`)
+- `RABBITMQ_URL` — RabbitMQ connection (required)
+- `RESEND_API_KEY` — Resend API key for sending emails
+- `FROM_EMAIL` — Sender address (default: `Nature Shop <onboarding@resend.dev>`)
+- `VERIFICATION_URL_BASE` — Base URL for verification links
+- `LOG_LEVEL` — Pino log level (default: "info")
+
+### Docker Compose (`.env` at root)
+- `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `POSTGRES_PORT`
+- `RABBITMQ_USER`, `RABBITMQ_PASS`
 
 ---
 
@@ -367,3 +498,6 @@ Required per service (check `.env.example` when available):
 5. **Test first** — TDD is mandatory, not optional
 6. **90% coverage minimum** — No exceptions
 7. **Structured logging** — No string interpolation in logs
+8. **Fire & forget events** — Event publishing never breaks the main operation
+9. **Hexagonal purity** — Domain NEVER imports from infrastructure
+10. **Shared contracts** — Event types live in `@ecommerce/shared`, both services import them

@@ -28,17 +28,23 @@ y el aprendizaje personal para mejorar mi habilidad como desarrollador backend a
 ### Actuales
 - ✅ Arquitectura de microservicios con Arquitectura Hexagonal
 - ✅ Autenticación JWT con refresh tokens
+- ✅ Verificación de email con tokens de un solo uso
+- ✅ Event-driven architecture con RabbitMQ
+- ✅ Email service con Resend (envío real de emails)
 - ✅ Validación estricta con Zod
 - ✅ TypeScript en modo estricto
 - ✅ Logging estructurado con Pino
-- ✅ TDD con 90%+ cobertura
+- ✅ TDD con 100% cobertura
+- ✅ Documentación interactiva con Scalar (OpenAPI)
+- ✅ Docker Compose (PostgreSQL + RabbitMQ)
+- ✅ Dockerfile multi-stage para auth service
 
 ### Planificadas
 - 🔲 API Gateway con rate limiting
-- 🔲 Event-driven architecture con Kafka
-- 🔲 Kubernetes deployment
+- 🔲 Servicio de pedidos (api/orders)
+- 🔲 Kubernetes deployment completo
 - 🔲 Frontend con Next.js
-- 🔲 Documentación con Swagger
+- 🔲 CI/CD pipeline
 
 ---
 
@@ -53,15 +59,34 @@ y el aprendizaje personal para mejorar mi habilidad como desarrollador backend a
         ┌─────────────┼─────────────┐
         ▼             ▼             ▼
    ┌─────────┐   ┌─────────┐   ┌─────────┐
-   │  Auth   │   │ Orders  │   │ [TBD]   │
+   │  Auth   │   │  Email  │   │ Orders  │
    │ Service │   │ Service │   │ Service │
    └────┬────┘   └────┬────┘   └────┬────┘
         │             │             │
-        └─────────────┼─────────────┘
-                      ▼
-              ┌───────────────┐
-              │   PostgreSQL  │
-              └───────────────┘
+        │     ┌───────┴───────┐     │
+        │     │   RabbitMQ    │     │
+        │     │ (msg broker)  │     │
+        │     └───────────────┘     │
+        │                           │
+        └───────────┬───────────────┘
+                    ▼
+            ┌───────────────┐
+            │   PostgreSQL  │
+            └───────────────┘
+```
+
+### Flujo de verificación de email
+
+```
+POST /api/auth/register
+  → Auth guarda usuario en PostgreSQL
+  → Auth genera verification token
+  → Auth publica evento "user.registered" a RabbitMQ
+  → Email service consume el evento
+  → Email service envía email via Resend
+  → Usuario recibe email con botón "Verify Email"
+  → Click → GET /api/auth/verify-email?token=UUID
+  → Auth valida token y marca emailVerifiedAt ✅
 ```
 
 ### Estructura del Monorepo
@@ -69,11 +94,13 @@ y el aprendizaje personal para mejorar mi habilidad como desarrollador backend a
 ```
 /
 ├── api/                    # Microservicios backend
-│   ├── auth/              # Autenticación JWT + refresh tokens
-│   └── orders/            # Gestión de pedidos
-├── ui/                     # Frontend (Next.js - planned)
-├── shared/                 # Código compartido entre servicios
-└── k8s/                    # Kubernetes manifests
+│   ├── auth/              # Autenticación JWT + refresh tokens + verificación email
+│   ├── email/             # Servicio de emails (consumer RabbitMQ + Resend)
+│   └── orders/            # Gestión de pedidos (planned)
+├── shared/                 # Código compartido (@ecommerce/shared)
+│   └── src/types/events.ts # Contratos de eventos (DomainEvent, UserRegisteredEvent)
+├── k8s/                    # Kubernetes manifests
+└── docker-compose.yml      # PostgreSQL + RabbitMQ
 ```
 
 ### Arquitectura Hexagonal (por servicio)
@@ -84,21 +111,21 @@ Cada microservicio sigue Arquitectura Hexagonal (Ports & Adapters) con 3 capas:
 |------|-----------------|
 | **Domain** | Entidades, value objects, interfaces de puertos (repositorios, servicios) |
 | **Application** | Casos de uso, orquestación de la lógica de negocio |
-| **Infrastructure** | Adaptadores entrantes (controllers, routes, DTOs) y salientes (DB, APIs externas) |
+| **Infrastructure** | Adaptadores entrantes (controllers, routes) y salientes (DB, RabbitMQ, APIs externas) |
 
 ```
 api/auth/src/
 ├── domain/           # Núcleo — sin dependencias externas
-│   ├── entities/     # User, Token...
-│   ├── value-objects/
-│   └── ports/        # Interfaces: UserRepository, TokenService...
+│   ├── entities/     # User, RefreshToken, VerificationToken
+│   ├── errors/       # DomainError subclasses
+│   └── ports/        # Interfaces: UserRepository, EventPublisher, TokenService...
 ├── application/      # Casos de uso — depende solo del dominio
-│   └── use-cases/    # CreateUser, Login, RefreshToken...
-└── infrastructure/   # Adaptadores — depende del dominio
-  ├── driving/      # HTTP: controllers, routes, DTOs
-  └── driven/       # Prisma repos, JWT service, Pino logger...
+│   ├── use-cases/    # Register, Login, VerifyEmail, RefreshToken...
+│   └── dtos/         # Zod schemas + tipos inferidos
+└── infrastructure/   # Adaptadores — implementan puertos
+    ├── driving/      # HTTP: controllers, routes
+    └── driven/       # Prisma repos, JWT, RabbitMQ publisher, Pino logger...
 ```
-
 
 ---
 
@@ -111,13 +138,15 @@ api/auth/src/
 | **Framework** | Express 5 |
 | **Language** | TypeScript 5.7 (strict mode) |
 | **ORM** | Prisma 7 |
-| **Database** | PostgreSQL |
+| **Database** | PostgreSQL 17 |
 | **Validation** | Zod 4 |
 | **Testing** | Vitest + Supertest |
 | **Logging** | Pino |
 | **Auth** | JWT + Refresh Tokens |
-| **Message Broker** | Kafka (planned) |
-| **Container** | Kubernetes (planned) |
+| **Message Broker** | RabbitMQ 4 |
+| **Email Provider** | Resend |
+| **API Docs** | Scalar (OpenAPI) |
+| **Container** | Docker + Kubernetes |
 
 ---
 
@@ -125,8 +154,7 @@ api/auth/src/
 
 - [Node.js](https://nodejs.org/) >= 22.0.0
 - [pnpm](https://pnpm.io/) >= 10.0.0
-- [PostgreSQL](https://www.postgresql.org/) >= 15
-- [Docker](https://www.docker.com/) (opcional, para desarrollo)
+- [Docker](https://www.docker.com/) (para PostgreSQL y RabbitMQ)
 
 ---
 
@@ -140,15 +168,26 @@ cd nature-shop
 # Instalar dependencias
 pnpm install
 
-# Copiar variables de entorno
-cp api/auth/.env.example api/auth/.env
+# Levantar infraestructura (PostgreSQL + RabbitMQ)
+docker compose up -d
+
+# Configurar variables de entorno
+cp .env.example .env
+# Editar api/auth/.env y api/email/.env con tus valores
 
 # Configurar base de datos
 pnpm --filter @ecommerce/auth-service exec prisma migrate dev
 
-# Iniciar en desarrollo
-pnpm --filter @ecommerce/auth-service dev
+# Iniciar servicios en desarrollo
+pnpm --filter @ecommerce/auth-service dev    # Terminal 1
+pnpm --filter @ecommerce/email-service dev   # Terminal 2
 ```
+
+### Verificar que todo funciona
+
+- **Auth service**: http://localhost:8080/health
+- **API Docs**: http://localhost:8080/api/auth/docs
+- **RabbitMQ Management**: http://localhost:15672 (guest/guest)
 
 ---
 
@@ -166,12 +205,17 @@ pnpm test:coverage     # Coverage report
 pnpm build             # Build all services
 ```
 
-### Nivel Servicio (ej: auth)
+### Nivel Servicio
 
 ```bash
+# Auth service
 pnpm --filter @ecommerce/auth-service dev          # Development
 pnpm --filter @ecommerce/auth-service test         # Run tests
-pnpm --filter @ecommerce/auth-service test:watch   # Watch mode
+pnpm --filter @ecommerce/auth-service test:coverage # Coverage
+
+# Email service
+pnpm --filter @ecommerce/email-service dev          # Development
+pnpm --filter @ecommerce/email-service test         # Run tests
 ```
 
 ### Test Individual
@@ -186,30 +230,64 @@ npx vitest run -t "should create user"
 
 ---
 
+## 🔑 Variables de Entorno
+
+### Auth Service (`api/auth/.env`)
+
+| Variable | Descripción | Ejemplo |
+|----------|-------------|---------|
+| `DATABASE_URL` | PostgreSQL connection | `postgresql://user:pass@localhost:5432/nature_shop_auth` |
+| `PORT` | Puerto del servicio | `8080` |
+| `JWT_SECRET` | Secret para signing tokens | `your-secret-key` |
+| `REFRESH_TOKEN_SECRET` | Secret para refresh tokens | `your-refresh-secret` |
+| `RABBITMQ_URL` | RabbitMQ connection (opcional) | `amqp://guest:guest@localhost:5672` |
+| `LOG_LEVEL` | Nivel de logging | `info` |
+
+### Email Service (`api/email/.env`)
+
+| Variable | Descripción | Ejemplo |
+|----------|-------------|---------|
+| `RABBITMQ_URL` | RabbitMQ connection | `amqp://guest:guest@localhost:5672` |
+| `RESEND_API_KEY` | API key de Resend | `re_xxxxx` |
+| `FROM_EMAIL` | Email remitente | `Nature Shop <onboarding@resend.dev>` |
+| `VERIFICATION_URL_BASE` | Base URL para verificación | `http://localhost:8080/api/auth/verify-email` |
+| `LOG_LEVEL` | Nivel de logging | `info` |
+
+---
+
 ## 🗺️ Roadmap
 
-### Fase 1: Core Backend ✅ (En progreso)
+### Fase 1: Core Backend ✅
 - [x] Setup monorepo + TypeScript strict
 - [x] Configuración de linting y formatting
-- [ ] Servicio de autenticación completo
-- [ ] Servicio de pedidos
-- [ ] 90%+ test coverage
+- [x] Servicio de autenticación (register, login, refresh, logout, change-password)
+- [x] Verificación de email con RabbitMQ + Resend
+- [x] Email service como microservicio independiente
+- [x] 100% test coverage
+- [x] Documentación API con Scalar (OpenAPI)
 
-### Fase 2: Infrastructure
+### Fase 2: Infrastructure (En progreso)
+- [x] Docker Compose (PostgreSQL + RabbitMQ)
+- [x] Dockerfile multi-stage para auth service
+- [x] Kubernetes manifests iniciales
 - [ ] API Gateway
-- [ ] Kafka integration
-- [ ] Docker containers
-- [ ] Kubernetes manifests
+- [ ] CI/CD pipeline
+- [ ] Kubernetes deployment completo
 
-### Fase 3: Frontend
+### Fase 3: Orders Service
+- [ ] Servicio de pedidos
+- [ ] Eventos de pedidos via RabbitMQ
+- [ ] Integración con inventario
+
+### Fase 4: Frontend
 - [ ] Next.js setup
 - [ ] UI components
-- [ ] Integration con backend
+- [ ] Integración con backend
 
-### Fase 4: Production
-- [ ] CI/CD pipeline
+### Fase 5: Production
 - [ ] Monitoring & observability
-- [ ] Documentation (Swagger)
+- [ ] Rate limiting
+- [ ] Caching
 
 ---
 
