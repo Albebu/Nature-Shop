@@ -1,4 +1,5 @@
 import { User } from '@domain/entities/user.js';
+import { EmailAlreadyVerifiedError } from '@domain/errors/email-already-verified.error.js';
 import { InvalidEmailError } from '@domain/errors/invalid-email.error.js';
 import { describe, expect, it } from 'vitest';
 
@@ -99,6 +100,21 @@ describe('User', () => {
 
       expect(user.getIsActive()).toBe(true);
     });
+
+    it('should default emailVerifiedAt to null when created', () => {
+      const user = User.create({
+        id: 'user-123',
+        tenantId: null,
+        firstName: 'Alex',
+        lastName: 'Bellosta',
+        email: 'alex@example.com',
+        passwordHash: '$argon2id$hash',
+        userType: 'CUSTOMER',
+      });
+
+      expect(user.getEmailVerifiedAt()).toBeNull();
+      expect(user.isEmailVerified()).toBe(false);
+    });
   });
 
   // ── fromDB() ───────────────────────────────────────────────
@@ -161,6 +177,38 @@ describe('User', () => {
       });
 
       expect(user.getIsActive()).toBe(true);
+    });
+
+    it('should preserve emailVerifiedAt from DB', () => {
+      const verifiedAt = new Date('2026-01-15T10:00:00Z');
+      const user = User.fromDB({
+        id: 'user-123',
+        tenantId: null,
+        firstName: 'Alex',
+        lastName: 'Bellosta',
+        email: 'alex@example.com',
+        passwordHash: '$argon2id$hash',
+        userType: 'CUSTOMER',
+        emailVerifiedAt: verifiedAt,
+      });
+
+      expect(user.getEmailVerifiedAt()).toEqual(verifiedAt);
+      expect(user.isEmailVerified()).toBe(true);
+    });
+
+    it('should default emailVerifiedAt to null when not provided from DB', () => {
+      const user = User.fromDB({
+        id: 'user-123',
+        tenantId: null,
+        firstName: 'Alex',
+        lastName: 'Bellosta',
+        email: 'alex@example.com',
+        passwordHash: '$argon2id$hash',
+        userType: 'CUSTOMER',
+      });
+
+      expect(user.getEmailVerifiedAt()).toBeNull();
+      expect(user.isEmailVerified()).toBe(false);
     });
   });
 
@@ -239,6 +287,81 @@ describe('User', () => {
       user.setPasswordHash('$argon2id$new_hash');
 
       expect(user.getPasswordHash()).toBe('$argon2id$new_hash');
+    });
+  });
+
+  // ── markEmailVerified() ────────────────────────────────────
+
+  describe('markEmailVerified', () => {
+    it('should mark the email as verified', () => {
+      const user = User.create({
+        id: 'user-123',
+        tenantId: null,
+        firstName: 'Alex',
+        lastName: 'Bellosta',
+        email: 'alex@example.com',
+        passwordHash: '$argon2id$hash',
+        userType: 'CUSTOMER',
+      });
+
+      expect(user.isEmailVerified()).toBe(false);
+
+      user.markEmailVerified();
+
+      expect(user.isEmailVerified()).toBe(true);
+      expect(user.getEmailVerifiedAt()).toBeInstanceOf(Date);
+    });
+
+    it('should throw EmailAlreadyVerifiedError if already verified', () => {
+      const user = User.fromDB({
+        id: 'user-123',
+        tenantId: null,
+        firstName: 'Alex',
+        lastName: 'Bellosta',
+        email: 'alex@example.com',
+        passwordHash: '$argon2id$hash',
+        userType: 'CUSTOMER',
+        emailVerifiedAt: new Date('2026-01-15T10:00:00Z'),
+      });
+
+      expect(user.isEmailVerified()).toBe(true);
+
+      expect(() => {
+        user.markEmailVerified();
+      }).toThrow(EmailAlreadyVerifiedError);
+    });
+  });
+
+  // ── isEmailVerified() ──────────────────────────────────────
+
+  describe('isEmailVerified', () => {
+    it('should return false for unverified user', () => {
+      const user = User.create({
+        id: 'user-123',
+        tenantId: null,
+        firstName: 'Alex',
+        lastName: 'Bellosta',
+        email: 'alex@example.com',
+        passwordHash: '$argon2id$hash',
+        userType: 'CUSTOMER',
+      });
+
+      expect(user.isEmailVerified()).toBe(false);
+    });
+
+    it('should return true for verified user', () => {
+      const user = User.fromDB({
+        id: 'user-123',
+        tenantId: null,
+        firstName: 'Alex',
+        lastName: 'Bellosta',
+        email: 'alex@example.com',
+        passwordHash: '$argon2id$hash',
+        userType: 'CUSTOMER',
+        emailVerifiedAt: new Date('2026-01-15T10:00:00Z'),
+      });
+
+      expect(user.isEmailVerified()).toBe(true);
     });
   });
 });

@@ -1,5 +1,6 @@
 import type { UserType } from '@ecommerce/shared';
 import { EMAIL_REGEX } from '@ecommerce/shared';
+import { EmailAlreadyVerifiedError } from '../errors/email-already-verified.error.js';
 import { InvalidEmailError } from '../errors/invalid-email.error.js';
 
 export class User {
@@ -11,6 +12,7 @@ export class User {
   private passwordHash: string;
   private userType: UserType;
   private active: boolean;
+  private emailVerifiedAt: Date | null;
 
   private constructor({
     id,
@@ -21,6 +23,7 @@ export class User {
     passwordHash,
     userType,
     isActive = true,
+    emailVerifiedAt = null,
   }: {
     id: User['id'];
     tenantId: User['tenantId'];
@@ -30,6 +33,7 @@ export class User {
     passwordHash: User['passwordHash'];
     userType: User['userType'];
     isActive?: boolean;
+    emailVerifiedAt?: Date | null;
   }) {
     this.id = id;
     this.tenantId = tenantId;
@@ -39,6 +43,7 @@ export class User {
     this.passwordHash = passwordHash;
     this.userType = userType;
     this.active = isActive;
+    this.emailVerifiedAt = emailVerifiedAt;
   }
 
   static create({
@@ -70,6 +75,7 @@ export class User {
       passwordHash,
       userType: 'CUSTOMER',
       isActive: true,
+      emailVerifiedAt: null,
     });
   }
 
@@ -82,6 +88,7 @@ export class User {
     passwordHash,
     userType,
     isActive = true,
+    emailVerifiedAt = null,
   }: {
     id: User['id'];
     tenantId: User['tenantId'];
@@ -91,8 +98,19 @@ export class User {
     passwordHash: User['passwordHash'];
     userType: User['userType'];
     isActive?: boolean;
+    emailVerifiedAt?: Date | null;
   }): User {
-    return new User({ id, tenantId, firstName, lastName, email, passwordHash, userType, isActive });
+    return new User({
+      id,
+      tenantId,
+      firstName,
+      lastName,
+      email,
+      passwordHash,
+      userType,
+      isActive,
+      emailVerifiedAt,
+    });
   }
 
   setPasswordHash(passwordHash: string): void {
@@ -137,5 +155,20 @@ export class User {
 
   getUserType(): User['userType'] {
     return this.userType;
+  }
+
+  getEmailVerifiedAt(): Date | null {
+    return this.emailVerifiedAt;
+  }
+
+  isEmailVerified(): boolean {
+    return this.emailVerifiedAt !== null;
+  }
+
+  markEmailVerified(): void {
+    if (this.emailVerifiedAt !== null) {
+      throw new EmailAlreadyVerifiedError();
+    }
+    this.emailVerifiedAt = new Date();
   }
 }
