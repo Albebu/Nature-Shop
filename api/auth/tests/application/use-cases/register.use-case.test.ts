@@ -1,12 +1,15 @@
 import type { RegisterDto } from '@application/dtos/register.dto.js';
 import { RegisterUseCase } from '@application/use-cases/register.use-case.js';
 import { User } from '@domain/entities/user.js';
+import type { EventPublisher } from '@domain/ports/event-publisher.port.js';
 import type { Logger } from '@domain/ports/logger.port.js';
 import type { PasswordService } from '@domain/ports/password.service.js';
 import type { RefreshTokenRepository } from '@domain/ports/refresh-token.repository.js';
 import type { TokenService } from '@domain/ports/token.service.js';
 import type { UserRepository } from '@domain/ports/user.repository.js';
-import { ConflictError } from '@ecommerce/shared';
+import type { VerificationTokenRepository } from '@domain/ports/verification-token.repository.js';
+import type { UserRegisteredEvent } from '@ecommerce/shared';
+import { ConflictError, USER_REGISTERED_ROUTING_KEY } from '@ecommerce/shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ─── Mocks ──────────────────────────────────────────────────────
@@ -46,6 +49,15 @@ const mockLogger: Logger = {
   debug: vi.fn(),
 };
 
+const mockEventPublisher: EventPublisher = {
+  publish: vi.fn(),
+};
+
+const mockVerificationTokenRepository: VerificationTokenRepository = {
+  save: vi.fn(),
+  findByToken: vi.fn(),
+};
+
 // ─── Fixtures ───────────────────────────────────────────────────
 // Datos reutilizables para no repetir en cada test
 
@@ -79,6 +91,8 @@ describe('RegisterUseCase', () => {
       mockPasswordService,
       mockTokenService,
       mockLogger,
+      mockEventPublisher,
+      mockVerificationTokenRepository,
     );
   });
 
@@ -173,7 +187,7 @@ describe('RegisterUseCase', () => {
         expect.objectContaining({
           userId: expect.any(String),
           userType: 'CUSTOMER',
-          tenantId: expect.any(String),
+          tenantId: null,
         }),
       );
     });
@@ -210,6 +224,91 @@ describe('RegisterUseCase', () => {
         { id: expect.any(String), email: VALID_INPUT.email },
         'Registering new user',
       );
+    });
+
+    it('should save a verification token', async () => {
+      await sut.execute(VALID_INPUT);
+
+      expect(mockVerificationTokenRepository.save).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: expect.any(String),
+          token: expect.any(String),
+          expiresAt: expect.any(Date),
+        }),
+      );
+    });
+
+    it('should publish user.registered event after successful registration', async () => {
+      await sut.execute(VALID_INPUT);
+
+      expect(mockEventPublisher.publish).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: USER_REGISTERED_ROUTING_KEY,
+          payload: expect.objectContaining({
+            userId: expect.any(String),
+            email: VALID_INPUT.email,
+            firstName: VALID_INPUT.firstName,
+            verificationToken: expect.any(String),
+          }),
+          occurredAt: expect.any(String),
+          correlationId: expect.any(String),
+        }),
+      );
+    });
+
+    it('should include verificationToken in event payload', async () => {
+      await sut.execute(VALID_INPUT);
+
+      const publishCall = vi.mocked(mockEventPublisher.publish).mock.calls[0];
+      const event = publishCall?.[0] as UserRegisteredEvent | undefined;
+
+      expect(event).toBeDefined();
+      expect(event?.payload).toHaveProperty('verificationToken');
+      expect(typeof event?.payload.verificationToken).toBe('string');
+      expect(event?.payload.verificationToken.length).toBeGreaterThan(0);
+    });
+  });
+
+  // ── Event publish failure resilience ──────────────────────────
+
+  describe('when event publish fails', () => {
+    it('should NOT fail registration if event publish fails', async () => {
+      vi.mocked(mockEventPublisher.publish).mockRejectedValue(
+        new Error('RabbitMQ connection lost'),
+      );
+
+      const result = await sut.execute(VALID_INPUT);
+
+      // Registration should still succeed
+      expect(result).toEqual({
+        token: ACCESS_TOKEN,
+        refreshToken: REFRESH_TOKEN_STRING,
+      });
+    });
+
+    it('should log the event publish error', async () => {
+      const publishError = new Error('RabbitMQ connection lost');
+      vi.mocked(mockEventPublisher.publish).mockRejectedValue(publishError);
+
+      await sut.execute(VALID_INPUT);
+
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.objectContaining({
+          error: publishError,
+          userId: expect.any(String),
+        }),
+        'Failed to publish user.registered event',
+      );
+    });
+
+    it('should still save the user even if event publish fails', async () => {
+      vi.mocked(mockEventPublisher.publish).mockRejectedValue(
+        new Error('RabbitMQ connection lost'),
+      );
+
+      await sut.execute(VALID_INPUT);
+
+      expect(mockUserRepository.save).toHaveBeenCalled();
     });
   });
 });

@@ -1,12 +1,18 @@
-import { ConflictError, SEVEN_DAYS_IN_MS } from '@ecommerce/shared';
+import type { UserRegisteredEvent } from '@ecommerce/shared';
+import { ConflictError, SEVEN_DAYS_IN_MS, USER_REGISTERED_ROUTING_KEY } from '@ecommerce/shared';
 import { RefreshToken } from '../../domain/entities/refresh-token.js';
 import { User } from '../../domain/entities/user.js';
+import { VerificationToken } from '../../domain/entities/verification-token.js';
+import type { EventPublisher } from '../../domain/ports/event-publisher.port.js';
 import type { Logger } from '../../domain/ports/logger.port.js';
 import type { PasswordService } from '../../domain/ports/password.service.js';
 import type { RefreshTokenRepository } from '../../domain/ports/refresh-token.repository.js';
 import type { TokenService } from '../../domain/ports/token.service.js';
 import type { UserRepository } from '../../domain/ports/user.repository.js';
+import type { VerificationTokenRepository } from '../../domain/ports/verification-token.repository.js';
 import type { RegisterDto, RegisterResponseDto } from '../dtos/register.dto.js';
+
+const TWENTY_FOUR_HOURS_IN_MS = 24 * 60 * 60 * 1000;
 
 export class RegisterUseCase {
   constructor(
@@ -15,6 +21,8 @@ export class RegisterUseCase {
     private readonly passwordService: PasswordService,
     private readonly tokenService: TokenService,
     private readonly logger: Logger,
+    private readonly eventPublisher: EventPublisher,
+    private readonly verificationTokenRepository: VerificationTokenRepository,
   ) {}
 
   async execute(input: RegisterDto): Promise<RegisterResponseDto> {
@@ -26,7 +34,7 @@ export class RegisterUseCase {
     const passwordHash = await this.passwordService.hashPassword(input.password);
     const userObject = User.create({
       id: crypto.randomUUID(),
-      tenantId: crypto.randomUUID(),
+      tenantId: null,
       firstName: input.firstName,
       lastName: input.lastName,
       email: input.email,
@@ -39,6 +47,37 @@ export class RegisterUseCase {
     await this.userRepository.save(userObject);
 
     this.logger.info({ userId: userObject.getId(), email: input.email }, 'User registered');
+
+    const verificationTokenString = crypto.randomUUID();
+    const verificationToken = VerificationToken.create({
+      id: crypto.randomUUID(),
+      userId: userObject.getId(),
+      token: verificationTokenString,
+      expiresAt: new Date(Date.now() + TWENTY_FOUR_HOURS_IN_MS),
+    });
+
+    await this.verificationTokenRepository.save(verificationToken);
+
+    try {
+      const event: UserRegisteredEvent = {
+        type: USER_REGISTERED_ROUTING_KEY,
+        payload: {
+          userId: userObject.getId(),
+          email: userObject.getEmail(),
+          firstName: userObject.getFirstName(),
+          verificationToken: verificationTokenString,
+        },
+        occurredAt: new Date().toISOString(),
+        correlationId: crypto.randomUUID(),
+      };
+
+      await this.eventPublisher.publish(event);
+    } catch (error) {
+      this.logger.error(
+        { error, userId: userObject.getId() },
+        'Failed to publish user.registered event',
+      );
+    }
 
     const token = this.tokenService.generate(userObject.getTokenPayload());
 
