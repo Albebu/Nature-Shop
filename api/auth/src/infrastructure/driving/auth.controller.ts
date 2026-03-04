@@ -1,11 +1,13 @@
 import { UnauthorizedError, ZodValidationError } from '@ecommerce/shared';
 import type { Request, Response } from 'express';
 import { z } from 'zod';
+import { verifyEmailSchema } from '../../application/dtos/verify-email.dto.js';
 import type { ChangePasswordUseCase } from '../../application/use-cases/change-password.use-case.js';
 import type { LoginUseCase } from '../../application/use-cases/login.use-case.js';
 import type { LogoutUseCase } from '../../application/use-cases/logout.use-case.js';
 import type { RefreshTokenUseCase } from '../../application/use-cases/refresh-token.use-case.js';
 import type { RegisterUseCase } from '../../application/use-cases/register.use-case.js';
+import type { VerifyEmailUseCase } from '../../application/use-cases/verify-email.use-case.js';
 import { ENV } from '../../env.js';
 import {
   changePasswordSchema,
@@ -21,6 +23,7 @@ export class AuthController {
     private readonly refreshTokenUseCase: RefreshTokenUseCase,
     private readonly logoutUseCase: LogoutUseCase,
     private readonly changePasswordUseCase: ChangePasswordUseCase,
+    private readonly verifyEmailUseCase: VerifyEmailUseCase,
   ) {}
 
   async register(req: Request, res: Response): Promise<void> {
@@ -131,5 +134,17 @@ export class AuthController {
     }
 
     res.status(200).json({ user: req.user });
+  }
+
+  async verifyEmail(req: Request, res: Response): Promise<void> {
+    const parsed = verifyEmailSchema.safeParse(req.query);
+
+    if (!parsed.success) {
+      throw new ZodValidationError(z.flattenError(parsed.error));
+    }
+
+    const result = await this.verifyEmailUseCase.execute(parsed.data);
+
+    res.status(200).json(result);
   }
 }

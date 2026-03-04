@@ -12,6 +12,7 @@ export function createAuthRouter(
   router.post('/register', (req, res) => controller.register(req, res));
   router.post('/login', (req, res) => controller.login(req, res));
   router.post('/refresh-token', (req, res) => controller.refreshToken(req, res));
+  router.get('/verify-email', (req, res) => controller.verifyEmail(req, res));
 
   // Protected
   router.post('/logout', authMiddleware, (req, res) => controller.logout(req, res));

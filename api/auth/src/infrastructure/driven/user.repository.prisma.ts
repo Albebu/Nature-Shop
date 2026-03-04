@@ -29,6 +29,7 @@ export class UserRepositoryPrisma implements UserRepository {
         email: user.getEmail(),
         passwordHash: user.getPasswordHash(),
         userType: user.getUserType(),
+        emailVerifiedAt: user.getEmailVerifiedAt(),
       },
       create: {
         id: user.getId(),
@@ -38,6 +39,7 @@ export class UserRepositoryPrisma implements UserRepository {
         email: user.getEmail(),
         passwordHash: user.getPasswordHash(),
         userType: user.getUserType(),
+        emailVerifiedAt: user.getEmailVerifiedAt(),
       },
     });
   }

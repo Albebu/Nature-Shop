@@ -11,6 +11,7 @@ const envSchema = z.object({
   SALT: z.coerce.number().int().positive().default(10),
   JWT_SECRET: z.string().min(1),
   REFRESH_TOKEN_SECRET: z.string().min(1),
+  RABBITMQ_URL: z.string().min(1).optional(),
 });
 
 export const ENV = envSchema.parse(process.env);
