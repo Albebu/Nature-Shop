@@ -1,0 +1,79 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth-service
+  namespace: nature-shop
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: auth-service
+  template:
+    metadata:
+      labels:
+        app: auth-service
+    spec:
+      containers:
+        - name: auth-service
+          image: ecommerce-auth:dev
+          # imagePullPolicy: Never le dice a k8s que use la imagen local,
+          # no intente descargarla de Docker Hub
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 3000
+          # Variables sensibles desde el Secret
+          envFrom:
+            - secretRef:
+                name: auth-secret
+          # Variables no sensibles directamente aquí
+          env:
+            - name: NODE_ENV
+              value: 'production'
+            - name: PORT
+              value: '3000'
+            - name: LOG_LEVEL
+              value: 'info'
+            - name: SALT
+              value: '10'
+          # Health checks — k8s usa tu endpoint /health
+          # livenessProbe: si falla, k8s REINICIA el Pod
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          # readinessProbe: si falla, k8s DEJA DE ENVIAR tráfico al Pod
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          # Límites de recursos — buena práctica, evita que un Pod devore todo el nodo
+          resources:
+            requests:
+              memory: '128Mi'
+              cpu: '100m'
+            limits:
+              memory: '512Mi'
+              cpu: '500m'
+
+---
+# =============================================================================
+# SERVICE — Expone el auth service
+# =============================================================================
+# NodePort: accesible desde FUERA del cluster (para poder probar con curl)
+# k8s asigna un puerto aleatorio entre 30000-32767 en tu máquina
+apiVersion: v1
+kind: Service
+metadata:
+  name: auth-service
+  namespace: nature-shop
+spec:
+  type: NodePort
+  selector:
+    app: auth-service
+  ports:
+    - port: 3000
+      targetPort: 3000

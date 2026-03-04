@@ -1,0 +1,15 @@
+*
+!api/auth/src/
+
+!api/auth/prisma/
+!api/auth/prisma.config.ts
+
+!**/tsconfig.json
+
+!**/package.json
+
+!pnpm-workspace.yaml
+!pnpm-lock.yaml
+!tsconfig.base.json
+
+!shared/src
