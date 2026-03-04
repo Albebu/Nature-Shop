@@ -19,5 +19,9 @@ export { createAuthMiddleware } from './middleware/auth.middleware.js';
 export type { TokenPayload } from './types/user.types.js';
 export type { UserType } from './types/user.types.js';
 
+// Events
+export type { DomainEvent, UserRegisteredPayload, UserRegisteredEvent } from './types/events.js';
+export { USER_EVENTS_EXCHANGE, USER_REGISTERED_ROUTING_KEY } from './types/events.js';
+
 // Express global augmentation (adds req.user)
 import './types/express.types.js';
